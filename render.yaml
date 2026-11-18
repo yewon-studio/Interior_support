@@ -1,0 +1,40 @@
+# render.yaml — Render Blueprint (ADR-003, docs/03_아키텍처_데이터_보안.md)
+# 소유: 통합 책임자 · 운영 배포는 통합 책임자만.
+# 연결(2026-10-28 확인): Render 는 이 저장소(nasaro-pro/interior-supporter)의 main 에 연결돼 있다
+#   (배포 기록이 GitHub Deployments 에 남음: b400b2e 10/24 · 507960f 10/27).
+# ⚠ 자동 배포는 실제로 동작하지 않는다 — 507960f(10/27)·cd46882(10/28)는 main 병합 후 배포가 시작되지 않았다.
+#   아래 autoDeployTrigger 는 Blueprint 로 동기화될 때만 적용되므로, 대시보드 Settings → Auto-Deploy 를
+#   'On Commit' 으로 직접 켜거나 병합할 때마다 Manual Deploy 한다.
+# 사용법(새로 만들 때): Render 대시보드 → New → Blueprint → 이 저장소 연결 → sync:false 값 입력 → Apply
+# sync: false 항목은 Blueprint 최초 생성 때 대시보드에서 값을 묻는다. 값은 이 파일에 쓰지 않는다.
+# 배포 순서: 마이그레이션 먼저(통합 책임자, npm run db:push) → main 병합 → 대시보드 Events 에서 그 커밋이 'Deploy live' 인지 확인
+#   (시작 안 됐으면 Manual Deploy → Deploy latest commit).
+services:
+  - type: web
+    name: interior-supporter
+    runtime: node
+    region: singapore
+    plan: free
+    branch: main
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_VERSION
+        value: '24'
+      - key: LOG_LEVEL
+        value: info
+      # 공개 값이지만 빌드 시점에 번들에 들어가므로 바꾸면 재빌드(Manual Deploy)가 필요하다
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: NEXT_PUBLIC_APP_NAME
+        sync: false
+      # 서비스 주소. Render 가 이름 뒤에 접미어를 붙였으면 실제 주소로 넣는다 (예: https://interior-supporter.onrender.com)
+      - key: APP_ORIGIN
+        sync: false
+      # 비밀 (서버 전용)
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false

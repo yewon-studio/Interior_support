@@ -1,0 +1,320 @@
+{
+  "screen": {
+    "list": "Projects",
+    "container": "Project",
+    "overview": "Overview",
+    "settings": "Project settings",
+    "myProjects": "My projects",
+    "myAssigned": "My assigned projects",
+    "home": "Home",
+    "dashboard": "Dashboard"
+  },
+  "tab": {
+    "overview": "Overview",
+    "home": "Home",
+    "designs": "Designs",
+    "materials": "Materials",
+    "requests": "Requests",
+    "photos": "Photos",
+    "schedule": "Schedule",
+    "estimates": "Estimates",
+    "settings": "Settings",
+    "memos": "Notes"
+  },
+  "status": {
+    "planned": "Planned",
+    "active": "In progress",
+    "on_hold": "On hold",
+    "completed": "Completed"
+  },
+  "participantRole": {
+    "pm": "PM",
+    "customer": "Customer",
+    "field": "Field crew"
+  },
+  "homeSection": {
+    "overview": "Progress",
+    "recent": "Recent site photos",
+    "schedule": "Upcoming",
+    "documents": "Designs"
+  },
+  "field": {
+    "name": "Project name",
+    "siteAddress": "Site address",
+    "startDate": "Start date",
+    "endDate": "End date",
+    "period": "Construction period",
+    "currentPhase": "Current phase",
+    "isPublic": "Visible to customer",
+    "homeMessage": "Customer home message"
+  },
+  "list": {
+    "create": "New project",
+    "searchPlaceholder": "Search by project name or site address",
+    "summaryTitle": "Project summary",
+    "summaryItem": "{status}: {count}",
+    "empty": "No projects yet. Create a new project to get started.",
+    "statusLabel": "Status",
+    "createHint": "New projects are private by default. The customer home message starts from the company template.",
+    "noPeriod": "No dates",
+    "unanswered": "My unanswered requests",
+    "thisWeekEvents": "This week's schedule"
+  },
+  "switcher": {
+    "label": "Switch project",
+    "archivedOption": "(Archived) {name}"
+  },
+  "home": {
+    "editTitle": "Edit customer home",
+    "preview": "Customer preview",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "show": "Show",
+    "saved": "Customer home saved. Customers see the change right away.",
+    "previewNotice": "The preview shows only what customers can see.",
+    "empty": "Nothing to share yet.",
+    "sectionsLabel": "Customer home section order and visibility",
+    "privateProjectNotice": "This project is still private, so customers cannot open it yet.",
+    "themeLabel": "Color theme",
+    "pageToneLabel": "Page mood",
+    "pageImagesLabel": "Images by page",
+    "pageImagesHint": "Change page images in Settings > Templates. Here you only choose whether to show them.",
+    "showImage": "Show",
+    "titleFontLabel": "Title font",
+    "titleWeightLabel": "Title weight",
+    "titleSample": "Our home"
+  },
+  "settings": {
+    "basic": "Basic information",
+    "visibility": "Visibility",
+    "participants": "Participants",
+    "archive": "Archive",
+    "publicHint": "Turn this on so invited customers can open this project.",
+    "phaseHint": "The current phase shown on the customer home. It is not calculated from photos or schedules.",
+    "archiveHint": "Archived projects are hidden from customers and field crews. You can restore them at any time."
+  },
+  "participants": {
+    "inviteCustomer": "Invite customer",
+    "inviteField": "Invite field crew",
+    "assignPm": "Assign PM",
+    "pendingInvites": "Pending invitations",
+    "revokeInvite": "Revoke invitation",
+    "revokeParticipant": "Remove from project",
+    "canConfirm": "Confirm right",
+    "validFrom": "From",
+    "validUntil": "Until",
+    "unlimited": "No limit",
+    "empty": "No participants yet. Invite a customer or field crew.",
+    "confirmRightHint": "Only customers with the confirm right can confirm designs and materials.",
+    "periodHint": "Leave blank for no limit. Dates use Korea time and include both the start and end dates.",
+    "expired": "Participation period has ended.",
+    "stateRevoked": "Revoked",
+    "statePending": "Not started",
+    "stateActive": "Active",
+    "yes": "Yes",
+    "no": "No",
+    "noPendingInvites": "No pending invites.",
+    "expiresLabel": "Expires"
+  },
+  "toast": {
+    "created": "Project created.",
+    "inviteRevoked": "Invitation link revoked.",
+    "participantRevoked": "Participant removed."
+  },
+  "myProjects": {
+    "empty": "No projects to show. Projects appear here once your company makes them visible."
+  },
+  "confirm": {
+    "archive": {
+      "title": "Archive this project?",
+      "body": "Customers and field crews will no longer see this project. You can restore it from the archive at any time."
+    },
+    "revokeInvite": {
+      "title": "Revoke this invitation link?",
+      "body": "No one will be able to join using this link."
+    },
+    "revokeParticipant": {
+      "title": "Remove {name} from this project?",
+      "body": "They will lose access immediately. Their past activity stays on record."
+    },
+    "restore": {
+      "title": "Restore this project?",
+      "body": "Once restored, customers and field crews can see it again according to its visibility."
+    }
+  },
+  "state": {
+    "archived": "This project is archived. Customers and field crews can’t see it until it’s restored."
+  },
+  "overview": {
+    "recentEmpty": "No recent updates.",
+    "scheduleEmpty": "No upcoming schedule.",
+    "documentsEmpty": "No shared documents.",
+    "phaseEmpty": "Current phase not set."
+  },
+  "invite": {
+    "created": "Invitation link created. Copy and share it now — you won’t be able to see it again.",
+    "expiresAt": "Single-use link, valid until {datetime}.",
+    "reissueHint": "Creating a new link for the same email automatically revokes the previous one.",
+    "noEmailHint": "No email is sent. Copy the link and share it yourself, for example via a messenger.",
+    "closeWarning": "You cannot see this link again after closing. Copy it now.",
+    "create": "Create invite link"
+  },
+  "account": {
+    "createCustomer": "Create customer account",
+    "createField": "Create field crew account",
+    "hint": "Creating an account emails the ID (email) and a temporary password. If the email already has an account, it is only added to this project.",
+    "project": "Project",
+    "emailId": "Email (sign-in ID)",
+    "submit": "Create and send",
+    "mailSent": "Account created and email sent.",
+    "created": "Account created. The email couldn't be sent, so share the temporary password yourself.",
+    "assignedExisting": "This person already has an account, so they were added to this project.",
+    "tempTitle": "Temporary password",
+    "mailNotSent": "The email couldn't be sent. Copy the details below and share them directly.",
+    "closeWarning": "Once you close this, you can't see the temporary password again. Resend it if needed.",
+    "copy": "Copy ID and password",
+    "resend": "Resend temporary password",
+    "alreadyActive": "This account already set its own password. Use a reset link if they forgot it."
+  },
+  "createPermission": {
+    "request": "Request permission to create projects",
+    "requested": "Asked the company admin for permission to create projects.",
+    "pending": "Permission requested — waiting for the company admin."
+  },
+  "homeTheme": {
+    "brand": "Teal (default)",
+    "info": "Blue",
+    "positive": "Green",
+    "caution": "Yellow",
+    "attention": "Orange",
+    "neutral": "Gray"
+  },
+  "pageTone": {
+    "default": "Default",
+    "ivory": "Ivory",
+    "sand": "Sand",
+    "greige": "Greige",
+    "sage": "Sage",
+    "mist": "Mist",
+    "clay": "Clay"
+  },
+  "customerPreview": {
+    "open": "Preview customer view",
+    "bannerTitle": "Previewing the customer view",
+    "bannerBody": "This is exactly what customers see (public items only). Memos, comments and confirmation are off in preview, and memo threads look empty because customers only see their own.",
+    "notPublic": "Customer access is off for this project, so real customers can't open this view yet.",
+    "exit": "End preview"
+  },
+  "myHome": {
+    "progressTitle": "Your home",
+    "phaseEmpty": "Preparing",
+    "noPeriod": "Dates not set",
+    "progress": {
+      "during": "Day {day} · {left} days to completion",
+      "before": "{days} days until work starts",
+      "after": "Finishing up",
+      "done": "Work is complete",
+      "unknown": "Progress appears once dates are set"
+    },
+    "photosTitle": "Recent photos",
+    "photosAll": "All photos",
+    "photosEmpty": "No photos yet.",
+    "photosFailed": "Could not load photos. Please try again shortly.",
+    "commentCount": "{n} comments",
+    "recentComments": "Recent comments",
+    "me": "Me"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "today": "{date}",
+    "greeting": "Hello, {name}.",
+    "todoCount": "You have <em>{count} things</em> to check today.",
+    "todoNone": "You're all caught up for today.",
+    "tabsLabel": "Dashboard sections",
+    "tab": {
+      "all": "All",
+      "projects": "Projects",
+      "requests": "Requests",
+      "schedule": "Schedule",
+      "documents": "Designs & materials",
+      "photos": "Photos"
+    },
+    "kpi": {
+      "active": "Active projects",
+      "activeSub": "{count} planned",
+      "unanswered": "Requests to answer",
+      "unansweredSub": "Waiting for your reply",
+      "unansweredNone": "All answered",
+      "week": "Events this week",
+      "weekSub": "{count} today",
+      "pending": "Designs awaiting approval",
+      "pendingSub": "Waiting for the client"
+    },
+    "section": {
+      "todo": "To check today",
+      "projects": "Active projects",
+      "week": "This week",
+      "photos": "Recent site photos",
+      "requests": "Open requests",
+      "pendingDesigns": "Designs awaiting approval",
+      "recentDocuments": "Recent designs & materials",
+      "schedule": "Events this week"
+    },
+    "more": {
+      "todo": "View all",
+      "projects": "All projects",
+      "calendar": "Calendar",
+      "photos": "All photos"
+    },
+    "kind": {
+      "requests": "Request",
+      "schedule_events": "Event",
+      "designs": "Design",
+      "materials": "Material",
+      "photos": "Photo",
+      "estimate_versions": "Estimate"
+    },
+    "phase": "Current phase",
+    "phaseNone": "Not set",
+    "periodProgress": "{pct}% of the period elapsed",
+    "next": "Next: {title} · {date}",
+    "nextNone": "No upcoming events",
+    "requestMeta": "{project} · {status}",
+    "eventMeta": "{project} · {when}",
+    "designMeta": "{project} · waiting for the client",
+    "allDay": "All day",
+    "todayLabel": "Today",
+    "photosFoot": "{count} recent",
+    "doneThisWeek": "<strong>{count}</strong> events done this week",
+    "empty": {
+      "todo": "Nothing to check today.",
+      "projects": "No active projects.",
+      "week": "No events this week.",
+      "photos": "No site photos yet.",
+      "requests": "No open requests.",
+      "documents": "No recent designs or materials."
+    },
+    "partial": "Some information couldn't be loaded. Please refresh in a moment.",
+    "noCover": "No cover photo"
+  },
+  "titleFont": {
+    "noto_sans": "Sans (Noto Sans)",
+    "noto_serif": "Serif (Noto Serif)"
+  },
+  "titleWeight": {
+    "400": "Regular",
+    "500": "Medium",
+    "600": "Bold"
+  },
+  "portalHeader": {
+    "eyebrow": "My Home"
+  },
+  "customerHome": {
+    "progressEyebrow": "Progress",
+    "all": "View all",
+    "failed": "Couldn't load this. Please try again shortly.",
+    "designsEmpty": "No designs shared yet.",
+    "confirmed": "Confirmed",
+    "needsCheck": "Needs review"
+  }
+}

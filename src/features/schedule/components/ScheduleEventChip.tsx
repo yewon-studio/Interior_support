@@ -1,0 +1,53 @@
+// 일정 칩 — 제목 + 시각(또는 종일), 클릭 → 정규 상세 (PM-18 / CL-18)
+import Link from 'next/link';
+import { useLocale, useTranslations } from 'next-intl';
+import { EyeOff } from 'lucide-react';
+import type { DateLocale } from '@/shared/lib/dates';
+import { cn } from '@/shared/lib/utils';
+import { chipTime } from '../lib/format';
+import { PROGRESS_STYLE, ScheduleProgressIcon } from './ScheduleProgress';
+import type { ScheduleEvent } from '../types';
+
+export function ScheduleEventChip({
+  event,
+  href,
+  projectName,
+  showVisibility = false,
+  className,
+}: {
+  event: ScheduleEvent;
+  href: string;
+  projectName?: string;
+  showVisibility?: boolean;
+  className?: string;
+}) {
+  const t = useTranslations();
+  const locale = useLocale() as DateLocale;
+  return (
+    <Link
+      href={href}
+      data-key={event.id}
+      data-ui-key="schedule-event-open"
+      className={cn(
+        'bg-accent text-accent-foreground hover:bg-primary/15 focus-visible:ring-ring/50 flex min-h-6 items-center gap-1.5 rounded-sm border-s-2 px-1.5 py-0.5 text-xs leading-tight outline-none focus-visible:ring-3 motion-safe:transition-colors',
+        PROGRESS_STYLE[event.progress].chip,
+        event.progress === 'done' && 'opacity-80',
+        className,
+      )}
+      data-progress={event.progress}
+    >
+      <ScheduleProgressIcon progress={event.progress} />
+      {showVisibility && !event.isPublic ? (
+        <EyeOff className="size-3 shrink-0" aria-label={t('common.visibility.private')} />
+      ) : null}
+      {/* 제목 먼저, 시각(또는 '종일')은 뒤에 — 예: '바닥시공 종일' · '바닥시공 09:00' */}
+      <span className="min-w-0 truncate font-medium">
+        {projectName ? `${projectName} · ` : ''}
+        {event.title}
+      </span>
+      <span className="shrink-0 tabular-nums opacity-80">
+        {chipTime(event.startTime, locale, t('schedule.field.allDay'))}
+      </span>
+    </Link>
+  );
+}

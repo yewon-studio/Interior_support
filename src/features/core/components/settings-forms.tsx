@@ -1,0 +1,780 @@
+'use client';
+// src/features/core/components/settings-forms.tsx (A · TASK-015·016) — 업체 정보·로고·템플릿(고객 홈 전체, CR-A-10)·구성원 초대·재설정 링크
+import { useActionState, useRef, useState, useTransition, type ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
+import { toast } from 'sonner';
+import {
+  ChevronDown,
+  Eye,
+  ImageOff,
+  KeyRound,
+  MoreHorizontal,
+  Upload,
+  UserMinus,
+  UserPlus,
+  X,
+} from 'lucide-react';
+import { Button } from '@/shared/ui/button';
+import { Input } from '@/shared/ui/input';
+import { Textarea } from '@/shared/ui/textarea';
+import { FormError, FormRow, SubmitButton } from '@/shared/ui/form-parts';
+import { NativeSelect } from '@/shared/ui/native-fields';
+import { ConfirmDialog } from '@/shared/ui/confirm-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/shared/ui/dropdown-menu';
+import { useActionErrorText } from '@/shared/ui/action-error';
+import { createBrowserSupabase } from '@/shared/lib/supabase/browser';
+import { FILE_RULES } from '@/shared/contracts/domain';
+import type { ActionResult, AppError } from '@/shared/contracts/errors';
+import type { HomeSections } from '@/shared/contracts/domain';
+import { PORTAL_TABS, type PortalTab } from '@/shared/contracts/screens';
+import { routes } from '@/shared/contracts/routes';
+import { ConflictState } from '@/shared/ui/states';
+import { createUploadIntent, finalizeUpload } from '@/features/files';
+import { setCompanyLogo, updateCompany, updateTemplate } from '../server/company-actions';
+import { changeMemberRole, createMemberInvite } from '../server/participant-actions';
+import { createPasswordResetLink } from '../server/auth-actions';
+import type { HomeTheme } from '../home-theme';
+import type { PageImages, PageTone } from '../page-theme';
+import { FormSheet } from './form-sheet';
+import { HomeSectionsField, HomeThemeField, PageToneField } from './home-template-fields';
+import { PageCanvas } from './page-canvas';
+import { CustomerHomeBody, Panel } from './summary-blocks';
+import { OneTimeLinkDialog } from './one-time-link';
+
+type V = ActionResult<{ version: number }> | null;
+
+/** 저장 후 토스트·새로고침 (실패 시 입력 보존) */
+function useSaved(fn: (prev: V, form: FormData) => Promise<NonNullable<V>>) {
+  const t = useTranslations('common');
+  const router = useRouter();
+  return useActionState(async (prev: V, form: FormData) => {
+    const res = await fn(prev, form);
+    if (res.ok) {
+      toast.success(t('toast.saved'));
+      router.refresh();
+    }
+    return res;
+  }, null);
+}
+
+export function CompanyInfoForm({
+  companyId,
+  name,
+  version,
+  slug,
+}: {
+  companyId: string;
+  name: string;
+  version: number;
+  slug: string;
+}) {
+  const t = useTranslations();
+  const [state, action] = useSaved(updateCompany);
+  const fe = state && !state.ok ? state.error.fieldErrors : undefined;
+  const current = state?.ok ? state.data.version : version;
+  return (
+    <form action={action} className="flex flex-col gap-4" noValidate>
+      <input type="hidden" name="companyId" value={companyId} />
+      <input type="hidden" name="baseVersion" value={current} />
+      <FormRow label={t('settings.field.companyName')} htmlFor="co-name" errors={fe?.name} required>
+        <Input
+          id="co-name"
+          name="name"
+          defaultValue={name}
+          maxLength={100}
+          aria-describedby="co-name-error"
+          required
+        />
+      </FormRow>
+      <FormRow
+        label={t('settings.field.slug')}
+        htmlFor="co-slug"
+        hint={t('settings.company.slugLocked')}
+      >
+        <Input id="co-slug" value={slug} readOnly disabled />
+      </FormRow>
+      {state && !state.ok && !fe ? <FormError error={state.error} /> : null}
+      <div>
+        <SubmitButton data-ui-key="company-info-submit">{t('common.action.save')}</SubmitButton>
+      </div>
+    </form>
+  );
+}
+
+/**
+ * 업체 이미지(company_logo kind, 1MB) 업로드 — 서명 URL → finalize. 성공 시 fileId.
+ * 로고와 고객 홈 배경(CR-A-10)이 같이 쓴다. 업로드는 B 의 FilesApi 시그니처로만 (헌법 4.1 ④)
+ */
+function useCompanyImageUpload(companyId: string) {
+  const t = useTranslations();
+  const [pending, start] = useTransition();
+  const rule = FILE_RULES.company_logo;
+  const upload = (file: File, onReady: (fileId: string) => Promise<void> | void) =>
+    start(async () => {
+      const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+      if (!rule.exts.includes(ext)) return void toast.error(t('errors.FILE_TYPE_REJECTED'));
+      if (file.size > rule.maxBytes) return void toast.error(t('errors.FILE_TOO_LARGE'));
+      const intent = await createUploadIntent({
+        kind: 'company_logo',
+        projectId: null,
+        companyId,
+        fileName: file.name,
+        sizeBytes: file.size,
+        mime: file.type,
+      });
+      if (!intent.ok) return void toast.error(t(`errors.${intent.error.code}`));
+      const up = await createBrowserSupabase()
+        .storage.from(intent.data.bucket)
+        .uploadToSignedUrl(intent.data.path, intent.data.token, file);
+      if (up.error) return void toast.error(t('files.queue.interrupted'));
+      const fin = await finalizeUpload(intent.data.fileId);
+      if (!fin.ok || fin.data.status !== 'ready') return void toast.error(t('errors.FILE_CORRUPT'));
+      await onReady(intent.data.fileId);
+    });
+  return { upload, pending, rule };
+}
+
+/** 로고(1MB) — 업로드는 B 의 FilesApi(개발 중 STUB) 시그니처로만 (헌법 4.1 ④) */
+export function LogoUploader({
+  companyId,
+  version,
+  logoUrl,
+}: {
+  companyId: string;
+  version: number;
+  logoUrl: string | null;
+}) {
+  const t = useTranslations();
+  const router = useRouter();
+  const input = useRef<HTMLInputElement>(null);
+
+  const { upload: uploadImage, pending, rule } = useCompanyImageUpload(companyId);
+
+  const upload = (file: File) =>
+    uploadImage(file, async (fileId) => {
+      const res = await setCompanyLogo({ companyId, baseVersion: version, fileId });
+      if (!res.ok) return void toast.error(t(`errors.${res.error.code}`));
+      toast.success(t('settings.toast.logoUpdated'));
+      router.refresh();
+    });
+
+  return (
+    <div className="flex flex-wrap items-center gap-4">
+      <div className="bg-muted grid size-16 place-items-center overflow-hidden rounded-md border">
+        {logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- /api/files 302 서명 URL (next/image 최적화 대상 아님)
+          <img src={logoUrl} alt={t('settings.field.logo')} className="size-full object-contain" />
+        ) : (
+          <span className="text-muted-foreground text-meta">{t('settings.company.noLogo')}</span>
+        )}
+      </div>
+      <div className="flex flex-col gap-1">
+        <input
+          ref={input}
+          type="file"
+          accept={rule.exts.join(',')}
+          className="sr-only"
+          id="logo-file"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) upload(f);
+            e.target.value = '';
+          }}
+        />
+        <Button
+          variant="outline"
+          disabled={pending}
+          aria-busy={pending}
+          onClick={() => input.current?.click()}
+          data-ui-key="company-logo-upload"
+        >
+          <Upload aria-hidden />
+          {t('common.action.upload')}
+        </Button>
+        <p className="text-muted-foreground text-meta">
+          {t('files.dropzone.spec', { exts: rule.exts.join(', '), size: '1MB' })}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * REQ-052 기본 템플릿 — 신규 프로젝트 고객 화면 기본값 (CR-A-10)
+ * 페이지 분위기(바탕색) + 페이지(탭)별 이미지 + 홈 안내문·색상 테마·4영역, 페이지별 미리보기
+ */
+export function TemplateForm({
+  companyId,
+  version,
+  value,
+}: {
+  companyId: string;
+  version: number;
+  value: {
+    homeMessage: string;
+    homeSections: HomeSections;
+    homeTheme: HomeTheme;
+    pageImages: PageImages;
+    pageTone: PageTone;
+  };
+}) {
+  const t = useTranslations();
+  const router = useRouter();
+  const input = useRef<HTMLInputElement>(null);
+  const [message, setMessage] = useState(value.homeMessage);
+  const [sections, setSections] = useState(value.homeSections);
+  const [theme, setTheme] = useState(value.homeTheme);
+  const [images, setImages] = useState<PageImages>(value.pageImages);
+  const [tone, setTone] = useState(value.pageTone);
+  const [target, setTarget] = useState<PortalTab>('home');
+  const [previewPage, setPreviewPage] = useState<PortalTab>('home');
+  const [error, setError] = useState<AppError | null>(null);
+  const [saving, start] = useTransition();
+  const { upload, pending: uploading, rule } = useCompanyImageUpload(companyId);
+  const fe = error?.fieldErrors;
+  const pageName = (tab: PortalTab) => t(`projects.tab.${tab}`);
+
+  const setImage = (tab: PortalTab, fileId: string | null) =>
+    setImages((prev) => {
+      const next = { ...prev };
+      if (fileId) next[tab] = fileId;
+      else delete next[tab];
+      return next;
+    });
+
+  const save = () =>
+    start(async () => {
+      setError(null);
+      const res = await updateTemplate({
+        companyId,
+        baseVersion: version,
+        defaultHomeMessage: message,
+        defaultHomeSections: sections,
+        defaultHomeTheme: theme,
+        defaultPageImages: images,
+        defaultPageTone: tone,
+      });
+      if (res.ok) {
+        toast.success(t('settings.templates.saved'));
+        router.refresh();
+      } else setError(res.error);
+    });
+
+  if (error?.code === 'VERSION_CONFLICT') {
+    return (
+      <ConflictState
+        action={
+          <Button
+            onClick={() => {
+              // 입력은 그대로 두고 최신 version 만 다시 받는다 (HomeEditor A-06 과 같은 방식)
+              setError(null);
+              router.refresh();
+            }}
+            data-ui-key="template-reload"
+          >
+            {t('common.action.loadLatest')}
+          </Button>
+        }
+      />
+    );
+  }
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-2">
+      <div className="flex min-w-0 flex-col gap-6">
+        <p className="text-muted-foreground text-sm">{t('settings.templates.intro')}</p>
+        <PageToneField
+          name="tpl-tone"
+          value={tone}
+          onChange={setTone}
+          label={t('settings.field.pageTone')}
+          hint={t('settings.templates.pageToneHint')}
+        />
+        <div className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium" id="tpl-images-label">
+            {t('settings.field.pageImages')}
+          </span>
+          <input
+            ref={input}
+            type="file"
+            accept={rule.exts.join(',')}
+            className="sr-only"
+            id="tpl-page-file"
+            aria-labelledby="tpl-images-label"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              const tab = target;
+              if (f)
+                upload(f, (fileId) => {
+                  setImage(tab, fileId);
+                  setPreviewPage(tab);
+                  toast.success(t('settings.templates.imageUploaded', { page: pageName(tab) }));
+                });
+              e.target.value = '';
+            }}
+          />
+          <ul className="flex flex-col gap-2" aria-labelledby="tpl-images-label">
+            {PORTAL_TABS.map((tab) => {
+              const fileId = images[tab];
+              return (
+                <li
+                  key={tab}
+                  data-key={tab}
+                  className="flex items-center gap-3 rounded-md border px-3 py-2"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setPreviewPage(tab)}
+                    className="bg-muted grid aspect-video w-20 shrink-0 place-items-center overflow-hidden rounded border"
+                    aria-label={t('settings.templates.previewPage') + ': ' + pageName(tab)}
+                    data-ui-key="template-page-preview"
+                  >
+                    {fileId ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- /api/files 302 서명 URL (next/image 최적화 대상 아님)
+                      <img src={routes.file(fileId)} alt="" className="size-full object-cover" />
+                    ) : (
+                      <ImageOff aria-hidden className="text-muted-foreground size-4" />
+                    )}
+                  </button>
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-medium">{pageName(tab)}</span>
+                    {fileId ? null : (
+                      <span className="text-muted-foreground text-meta">
+                        {t('settings.templates.noImage')}
+                      </span>
+                    )}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    disabled={uploading}
+                    aria-busy={uploading && target === tab}
+                    aria-label={t('settings.templates.uploadFor', { page: pageName(tab) })}
+                    onClick={() => {
+                      setTarget(tab);
+                      input.current?.click();
+                    }}
+                    data-ui-key="template-page-upload"
+                  >
+                    <Upload aria-hidden />
+                  </Button>
+                  {fileId ? (
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={t('settings.templates.removeFor', { page: pageName(tab) })}
+                      onClick={() => setImage(tab, null)}
+                      data-ui-key="template-page-remove"
+                    >
+                      <X aria-hidden />
+                    </Button>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+          <p className="text-muted-foreground text-meta">
+            {t('settings.templates.pageImagesHint', { exts: rule.exts.join(', ') })}
+          </p>
+        </div>
+        <FormRow
+          label={t('settings.field.defaultHomeMessage')}
+          htmlFor="tpl-msg"
+          errors={fe?.defaultHomeMessage}
+          hint={t('settings.templates.hint')}
+        >
+          <Textarea
+            id="tpl-msg"
+            name="defaultHomeMessage"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            maxLength={2000}
+            rows={5}
+            aria-describedby="tpl-msg-error"
+          />
+        </FormRow>
+        <HomeThemeField
+          name="tpl-theme"
+          value={theme}
+          onChange={setTheme}
+          label={t('settings.field.homeTheme')}
+        />
+        <div className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium">{t('settings.field.homeSections')}</span>
+          <HomeSectionsField
+            sections={sections}
+            onChange={setSections}
+            label={t('settings.field.homeSections')}
+          />
+        </div>
+        {error && !fe ? <FormError error={error} /> : null}
+        <div>
+          <Button
+            onClick={save}
+            disabled={saving || uploading}
+            aria-busy={saving}
+            data-ui-key="template-submit"
+          >
+            {t('common.action.save')}
+          </Button>
+        </div>
+      </div>
+      <section className="flex min-w-0 flex-col gap-2" aria-labelledby="tpl-preview-title">
+        <h3 id="tpl-preview-title" className="font-semibold">
+          {t('settings.templates.previewTitle')}
+        </h3>
+        <div className="rounded-lg border border-dashed p-3">
+          <p className="text-muted-foreground text-meta mb-3 flex items-center gap-1.5">
+            <Eye aria-hidden className="size-4" />
+            {t('settings.templates.previewNotice')}
+          </p>
+          <div
+            className="mb-3 flex flex-wrap gap-1.5"
+            role="group"
+            aria-label={t('settings.templates.previewPage')}
+          >
+            {PORTAL_TABS.map((tab) => (
+              <Button
+                key={tab}
+                size="sm"
+                variant={tab === previewPage ? 'default' : 'outline'}
+                aria-pressed={tab === previewPage}
+                onClick={() => setPreviewPage(tab)}
+                data-ui-key="template-preview-tab"
+              >
+                {pageName(tab)}
+              </Button>
+            ))}
+          </div>
+          <PageCanvas tone={tone} imageFileId={images[previewPage]} variant="contained">
+            {previewPage === 'home' ? (
+              <CustomerHomeBody
+                project={{
+                  homeMessage: message,
+                  homeSections: sections,
+                  homeTheme: theme,
+                  currentPhase: '',
+                  startDate: null,
+                  endDate: null,
+                }}
+                blocks={PREVIEW_BLOCKS}
+              />
+            ) : (
+              <Panel title={pageName(previewPage)}>
+                <p className="text-muted-foreground py-6 text-center">
+                  {t('settings.templates.previewPlaceholder', { page: pageName(previewPage) })}
+                </p>
+              </Panel>
+            )}
+          </PageCanvas>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+const EMPTY_BLOCK = { items: [], failed: false };
+const PREVIEW_BLOCKS = { recent: EMPTY_BLOCK, schedule: EMPTY_BLOCK, documents: EMPTY_BLOCK };
+
+/** REQ-051 구성원 초대 (PM: owner/manager, 관리자: owner) — 링크 1회 표시 */
+export function MemberInviteSheet({
+  companyId,
+  canInviteManager,
+}: {
+  companyId: string;
+  canInviteManager: boolean;
+}) {
+  const t = useTranslations();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [shown, setShown] = useState<{ link: string; expiresAt: string } | null>(null);
+  const [state, action] = useActionState(
+    async (prev: Awaited<ReturnType<typeof createMemberInvite>> | null, form: FormData) => {
+      const res = await createMemberInvite(prev, form);
+      if (res.ok) {
+        setShown(res.data);
+        setOpen(false);
+        router.refresh();
+      }
+      return res;
+    },
+    null,
+  );
+  const fe = state && !state.ok ? state.error.fieldErrors : undefined;
+  return (
+    <>
+      <FormSheet
+        triggerLabel={t('settings.members.invite')}
+        triggerIcon={<UserPlus aria-hidden />}
+        title={t('settings.members.invite')}
+        description={t('projects.invite.noEmailHint')}
+        uiKey="member-invite"
+        open={open}
+        onOpenChange={setOpen}
+      >
+        <form action={action} className="flex flex-col gap-4" noValidate>
+          <input type="hidden" name="companyId" value={companyId} />
+          <FormRow label={t('auth.field.email')} htmlFor="mi-email" errors={fe?.email} required>
+            <Input
+              id="mi-email"
+              name="email"
+              type="email"
+              aria-describedby="mi-email-error"
+              required
+            />
+          </FormRow>
+          <FormRow label={t('settings.field.role')} htmlFor="mi-role" errors={fe?.role}>
+            <NativeSelect id="mi-role" name="role" defaultValue="pm">
+              <option value="pm">{t('settings.memberRole.pm')}</option>
+              {canInviteManager ? (
+                <option value="manager">{t('settings.memberRole.manager')}</option>
+              ) : null}
+            </NativeSelect>
+          </FormRow>
+          {state && !state.ok && !fe ? <FormError error={state.error} /> : null}
+          <SubmitButton data-ui-key="member-invite-submit">
+            {t('projects.invite.create')}
+          </SubmitButton>
+        </form>
+      </FormSheet>
+      <OneTimeLinkDialog
+        link={shown?.link ?? null}
+        expiresAt={shown?.expiresAt}
+        title={t('settings.members.invite')}
+        description={t('projects.invite.created')}
+        onClose={() => setShown(null)}
+      />
+    </>
+  );
+}
+
+/** owner: manager 지정·해제 — 제어형 값, 바꾸기 전 확인, 실패하면 원래 값으로 되돌린다 (A-12) */
+export function MemberRoleSelect({
+  companyId,
+  memberId,
+  version,
+  role,
+  name,
+}: {
+  companyId: string;
+  memberId: string;
+  version: number;
+  role: 'manager' | 'pm';
+  /** 확인 대화상자에 보일 구성원 이름 */
+  name?: string;
+}) {
+  const t = useTranslations();
+  const router = useRouter();
+  const errorText = useActionErrorText();
+  const [value, setValue] = useState<'manager' | 'pm'>(role);
+  const [asked, setAsked] = useState<'manager' | 'pm' | null>(null);
+  const [busy, setBusy] = useState(false);
+  // 서버 값이 바뀌면(새로고침) 화면 값도 맞춘다
+  const [synced, setSynced] = useState(role);
+  if (synced !== role) {
+    setSynced(role);
+    setValue(role);
+  }
+  const label = (r: 'manager' | 'pm') => t(`settings.memberRole.${r}`);
+  return (
+    <>
+      {/* 표 안에서는 테두리 없는 글자형 (2026-11 구성원 표 개선): 'PM ⌄' + 마우스 올리면 연한 바탕 */}
+      <GhostSelectWrap>
+        <NativeSelect
+          aria-label={name ? `${t('settings.field.role')} · ${name}` : t('settings.field.role')}
+          className={GHOST_SELECT}
+          value={asked ?? value}
+          disabled={busy}
+          aria-busy={busy}
+          data-ui-key="member-role-select"
+          onChange={(e) => {
+            const next = e.target.value as 'manager' | 'pm';
+            if (next !== value) setAsked(next);
+          }}
+        >
+          <option value="manager">{label('manager')}</option>
+          <option value="pm">{label('pm')}</option>
+        </NativeSelect>
+      </GhostSelectWrap>
+      <ConfirmDialog
+        open={asked !== null}
+        onOpenChange={(open) => {
+          if (!open && !busy) setAsked(null); // 취소 → 원래 값 유지
+        }}
+        destructive={false}
+        uiKey="member-role-change"
+        title={name ? t('settings.confirm.changeRole.title', { name }) : t('settings.field.role')}
+        body={t('settings.confirm.changeRole.body', {
+          from: label(value),
+          to: label(asked ?? value),
+        })}
+        confirmLabel={t('settings.confirm.changeRole.confirm')}
+        pending={busy}
+        onConfirm={async () => {
+          const next = asked;
+          if (!next) return;
+          setBusy(true);
+          const res = await changeMemberRole({
+            companyId,
+            memberId,
+            baseVersion: version,
+            role: next,
+          });
+          if (res.ok) {
+            setValue(next);
+            toast.success(t('settings.toast.roleChanged'));
+          } else {
+            setValue(role); // 실패 → 서버 값으로 되돌림
+            toast.error(errorText(res.error));
+          }
+          setBusy(false);
+          setAsked(null);
+          router.refresh();
+        }}
+      />
+    </>
+  );
+}
+
+/** 표 안의 드롭다운 — 테두리 없이 글자 + 얇은 화살표 (구성원 표). 화살표는 select 위에 겹쳐 그린다 */
+export const GHOST_SELECT =
+  'hover:bg-muted focus-visible:bg-muted h-9 w-auto min-w-0 cursor-pointer appearance-none rounded-md border-0 bg-transparent pr-7 pl-2 text-sm font-medium';
+
+export function GhostSelectWrap({ children }: { children: ReactNode }) {
+  return (
+    <span className="relative -ml-2 inline-flex items-center">
+      {children}
+      <ChevronDown
+        aria-hidden
+        className="text-muted-foreground pointer-events-none absolute right-2 size-3.5"
+      />
+    </span>
+  );
+}
+
+/** REQ-005 재설정 링크 (owner/manager → 자기 업체 사용자, 소유자 제외) */
+export function ResetLinkButton({
+  companyId,
+  targetUserId,
+  name,
+}: {
+  companyId: string;
+  targetUserId: string;
+  name: string;
+}) {
+  const t = useTranslations();
+  const [pending, start] = useTransition();
+  const [link, setLink] = useState<string | null>(null);
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        disabled={pending}
+        aria-busy={pending}
+        data-ui-key="member-reset-link-create"
+        onClick={() =>
+          start(async () => {
+            const res = await createPasswordResetLink({ companyId, targetUserId });
+            if (res.ok) setLink(res.data.link);
+            else toast.error(t(`errors.${res.error.code}`));
+          })
+        }
+      >
+        <KeyRound aria-hidden />
+        {t('settings.members.createResetLink')}
+      </Button>
+      <OneTimeLinkDialog
+        link={link}
+        title={`${t('settings.members.createResetLink')} · ${name}`}
+        description={t('settings.members.resetLinkCreated')}
+        onClose={() => setLink(null)}
+      />
+    </>
+  );
+}
+
+/**
+ * 구성원 줄의 ⋯ 메뉴 (2026-11 구성원 표 개선) — 재설정 링크 만들기 · 구성원에서 제거를 한 버튼으로.
+ * 고른 뒤의 동작은 예전과 같다: 재설정 링크는 1회용 링크 대화상자, 제거는 확인 대화상자 (removeAction 은 페이지가 묶어 준 서버 액션)
+ */
+export function MemberActionsMenu({
+  companyId,
+  targetUserId,
+  name,
+  removeAction,
+}: {
+  companyId: string;
+  targetUserId: string;
+  name: string;
+  /** 없으면 제거 항목을 그리지 않는다 (소유자만 제거 가능) */
+  removeAction?: () => Promise<ActionResult<unknown>>;
+}) {
+  const t = useTranslations();
+  const [pending, start] = useTransition();
+  const [link, setLink] = useState<string | null>(null);
+  const [removing, setRemoving] = useState(false);
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          aria-label={`${t('common.action.moreActions')} · ${name}`}
+          disabled={pending}
+          className="text-muted-foreground hover:bg-muted hover:text-foreground inline-grid size-8 place-items-center rounded-md"
+          data-ui-key="member-actions-open"
+        >
+          <MoreHorizontal aria-hidden className="size-4" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-48">
+          <DropdownMenuItem
+            data-ui-key="member-reset-link-create"
+            onClick={() =>
+              start(async () => {
+                const res = await createPasswordResetLink({ companyId, targetUserId });
+                if (res.ok) setLink(res.data.link);
+                else toast.error(t(`errors.${res.error.code}`));
+              })
+            }
+          >
+            <KeyRound aria-hidden />
+            {t('settings.members.createResetLink')}
+          </DropdownMenuItem>
+          {removeAction ? (
+            <DropdownMenuItem
+              variant="destructive"
+              data-ui-key="member-remove-open"
+              onClick={() => setRemoving(true)}
+            >
+              <UserMinus aria-hidden />
+              {t('settings.members.remove')}
+            </DropdownMenuItem>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <OneTimeLinkDialog
+        link={link}
+        title={`${t('settings.members.createResetLink')} · ${name}`}
+        description={t('settings.members.resetLinkCreated')}
+        onClose={() => setLink(null)}
+      />
+      {removeAction ? (
+        <ConfirmDialog
+          open={removing}
+          onOpenChange={setRemoving}
+          title={t('settings.confirm.removeMember.title', { name })}
+          body={t('settings.confirm.removeMember.body')}
+          confirmLabel={t('settings.members.remove')}
+          successMessage={t('settings.toast.memberRemoved')}
+          action={removeAction}
+          uiKey="member-remove"
+        />
+      ) : null}
+    </>
+  );
+}
